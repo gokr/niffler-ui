@@ -1,0 +1,59 @@
+name: verify
+
+# What CI can actually verify for a Wails app, in two tiers:
+#   - every PR: the generated bindings + SPA typecheck + the frontend unit
+#     tests. The Go side compiles as a side effect of `wails generate module`,
+#     so a broken bridge binding fails here too.
+#   - tag pushes: a full `wails build` (needs webkit2gtk-4.1 + GTK3 + the wails
+#     CLI), proving the desktop binary builds from a clean clone.
+#
+# The SDK comes from a sibling checkout of the harness, exactly as go.mod
+# assumes; CI writes a go.work to the *cloned* harness instead of relying on
+# the ../niffler layout.
+
+on:
+  push:
+    tags: ["v*"]
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: gokr/niffler
+          path: .harness/niffler
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "stable"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Point the SDK replace at the harness clone
+        run: |
+          printf 'go %s\n\nuse .\n\nreplace niffler.dev/sdk => %s/.harness/niffler/sdk/go\n' \
+            "$(grep -m1 '^go ' go.mod | cut -d' ' -f2)" "$GITHUB_WORKSPACE" > go.work
+          cat go.work
+      - name: Install the wails CLI
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
+      - name: Bindings + typecheck + frontend tests
+        run: |
+          make bindings
+          make deps
+          make typecheck
+          make test
+      - name: System deps for a Wails build
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev
+      - name: Full desktop build
+        if: startsWith(github.ref, 'refs/tags/')
+        run: make build
+      - name: The built binary exists
+        if: startsWith(github.ref, 'refs/tags/')
+        run: test -x build/bin/niffler-ui && ls -lh build/bin/niffler-ui

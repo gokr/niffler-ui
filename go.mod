@@ -42,4 +42,4 @@ require (
 	golang.org/x/text v0.39.0 // indirect
 )
 
-replace niffler.dev/sdk => ../sdk/go
+replace niffler.dev/sdk => ../niffler/sdk/go

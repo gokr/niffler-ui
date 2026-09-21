@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
@@ -42,24 +43,58 @@ func NewBridge() *Bridge {
 	return b
 }
 
-// harnessRoot is where .env, var/nats-url and var/bin/niffler live: the
-// build-time baked root (icon launch) or the exe-path heuristic (in-tree).
+// harnessRoot is where .env, var/nats-url and var/bin/niffler live. Order:
+// NIF_ROOT (the launcher and the harness installer set it), then the
+// build-time baked root (an icon launch: no environment, no helpful layout),
+// then a walk up from the executable looking for the harness marker
+// (var/bin/niffler), and finally the executable's own directory.
+//
+// The walk matters now that this app lives in its own repository: the old
+// heuristic assumed <root>/ui/build/bin/niffler-ui, which neither a sibling
+// checkout nor an installed ~/.local/bin copy has.
 func harnessRoot() string {
+	if r := strings.TrimSpace(os.Getenv("NIF_ROOT")); r != "" {
+		return r
+	}
 	if nifRoot != "" {
 		return nifRoot
+	}
+	if found := findHarnessRoot(); found != "" {
+		return found
 	}
 	return uiRoot()
 }
 
-// uiRoot returns the Niffler root from the exe path:
-// <root>/ui/build/bin/niffler-ui → 4 levels up. Only valid when running the
-// in-tree binary.
+// findHarnessRoot walks up from the executable for a directory holding the
+// harness marker: var/bin/niffler, which every checkout and install has.
+func findHarnessRoot() string {
+	exe, err := os.Executable()
+	if err != nil {
+		return ""
+	}
+	dir := filepath.Dir(exe)
+	for i := 0; i < 6; i++ {
+		if _, err := os.Stat(filepath.Join(dir, "var", "bin", "niffler")); err == nil {
+			return dir
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			break
+		}
+		dir = parent
+	}
+	return ""
+}
+
+// uiRoot is the last resort: the executable's directory. Point the app at a
+// harness with NIF_ROOT (or launch it from the harness's launcher) when the
+// binary sits outside any harness tree.
 func uiRoot() string {
 	exe, err := os.Executable()
 	if err != nil {
 		return "."
 	}
-	return filepath.Dir(filepath.Dir(filepath.Dir(filepath.Dir(exe))))
+	return filepath.Dir(exe)
 }
 
 // resolveNatsUrl: NIF_NATS_URL env → <root>/var/nats-url discovery file
