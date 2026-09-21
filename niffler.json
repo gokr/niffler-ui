@@ -1,0 +1,50 @@
+{
+  "manifestVersion": 2,
+  "name": "niffler-ui",
+  "version": "0.1.1",
+  "description": "Desktop SPA for the Niffler harness — a NATS client in a Wails window",
+  "license": "MIT",
+  "homepage": "https://github.com/gokr/niffler-ui",
+  "components": [
+    {
+      "name": "niffler-ui",
+      "lang": "go",
+      "project": ".",
+      "interactive": true,
+      "build": {
+        "//": "Explicit argv, no shell: seed the embed target, install the SPA deps, generate the Wails bindings (which needs the embed target to exist), build the SPA, then build the app with the harness root baked in so an icon launch finds its harness. ${NIF_ROOT} is the installing harness.",
+        "steps": [
+          [
+            "node",
+            "-e",
+            "const fs=require('fs');fs.mkdirSync('frontend/dist',{recursive:true});if(!fs.existsSync('frontend/dist/index.html')){fs.writeFileSync('frontend/dist/index.html','<!doctype html><title>placeholder — the recipe overwrites this</title>')}"
+          ],
+          ["npm", "ci", "--no-audit", "--no-fund", "--prefix", "frontend"],
+          [
+            "go",
+            "run",
+            "github.com/wailsapp/wails/v2/cmd/wails@latest",
+            "generate",
+            "module"
+          ],
+          ["npm", "run", "build", "--prefix", "frontend"],
+          [
+            "go",
+            "run",
+            "github.com/wailsapp/wails/v2/cmd/wails@latest",
+            "build",
+            "-tags",
+            "webkit2_41",
+            "-nopackage",
+            "-ldflags",
+            "-X main.nifRoot=${NIF_ROOT}"
+          ]
+        ],
+        "artifact": {
+          "path": "build/bin/niffler-ui",
+          "runner": "executable"
+        }
+      }
+    }
+  ]
+}

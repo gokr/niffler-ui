@@ -11,19 +11,22 @@ runs in a plain browser (`make dev`, bridge stubbed) with no SPA changes.
 
 ## Install
 
-The supported way is through a Niffler checkout, which builds this package and
-installs the launcher (bus resolution + boot-on-demand, like `niffler-tui`):
+It is a Niffler **package** (manifest v2): the harness clones it and runs the
+recipe in `niffler.json` — no build step of yours. From a harness:
 
 ```bash
-cd ~/git/niffler
-make install WITH_UI=1        # or: make install-ui
-niffler-ui                    # attaches to a live harness, or boots one
+plugin_install {"repo": "gokr/niffler-ui"}   # builds it (npm + wails) and lands var/bin/niffler-ui
+cd ~/git/niffler && make install WITH_UI=1     # adds the launcher to your PATH
+niffler-ui                                     # attaches to a live harness, or boots one
 ```
 
-Requirements: Go 1.25+, Node 20+, the `wails` CLI
-(`go install github.com/wailsapp/wails/v2/cmd/wails@latest`) and, on Linux,
-webkit2gtk-4.1 + GTK3 development packages (`make install-ui-deps` in the
-harness, or `apt install libgtk-3-dev libwebkit2gtk-4.1-dev`).
+The recipe uses `go run github.com/wailsapp/wails/v2/cmd/wails@latest`, so the
+wails CLI does not have to be installed by hand; Go and Node are needed, and on
+Linux the webkit2gtk-4.1 + GTK3 development packages
+(`make install-ui-deps` in the harness).
+
+Because the package is `"interactive": true`, the harness builds and installs
+it but never spawns it — a desktop window is yours to open, like `niffler-tui`.
 
 ## Build it by hand
 
@@ -33,7 +36,6 @@ git clone https://github.com/gokr/niffler ../niffler   # sibling: the SDK lives 
 cd niffler-ui && make build
 ./build/bin/niffler-ui
 ```
-
 `go.mod` replaces `niffler.dev/sdk` with `../niffler/sdk/go` — the same
 sibling-checkout convention `gokr/niffler-tui` uses. A harness that installs
 this package from `var/plugins/` writes an untracked `go.work` instead, so the
