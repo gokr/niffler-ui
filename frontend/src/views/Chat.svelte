@@ -583,11 +583,23 @@
         idPrefix: sid + ":",
       });
       const stored: Msg[] = [];
+      // Tool results carry no arguments of their own: pair each stored tool
+      // message with the call that produced it so the compact gateway labels
+      // (discover(fabric), invoke(fetch)) survive a reload.
+      const callArgs = new Map<string, any>();
       for (const item of resp.items ?? []) {
         const v = item.value ?? {};
         if (v.role === "tool") {
-          stored.push({ role: "tool", content: v.content, tool: v.name });
+          stored.push({ role: "tool", content: v.content, tool: v.name,
+                        args: callArgs.get(v.tool_call_id) });
+          callArgs.delete(v.tool_call_id);
         } else if (v.role === "assistant") {
+          for (const call of v.tool_calls ?? []) {
+            if (call.id && typeof call.function?.arguments === "string") {
+              try { callArgs.set(call.id, JSON.parse(call.function.arguments)); }
+              catch { /* malformed tool arguments have no compact label */ }
+            }
+          }
           stored.push({
             role: "assistant",
             content: v.content ?? "",

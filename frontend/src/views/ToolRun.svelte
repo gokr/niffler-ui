@@ -6,6 +6,7 @@
   // brief (collapsed cards, default), full (every card expanded) and off
   // (hidden entirely). Display-side only — cards always arrive.
   import { toolLevel } from "../lib/prefs.svelte";
+  import { toolLabel } from "../lib/toolLabel";
 
   interface Item {
     tool?: string;
@@ -60,7 +61,7 @@
     <span class="tool-run-chevron">▸</span>
     {#if items.length === 1}
       <span class="tool-run-summary">
-        {glyph(items[0])} {items[0].tool ?? "tool"}
+        {glyph(items[0])} {toolLabel(items[0].tool, items[0].args)}
         {#if anyPending}<span class="animate-pulse text-accent">running…</span>{/if}
       </span>
     {:else}
@@ -70,7 +71,7 @@
     {/if}
     {#each items.slice(0, 8) as m, i (i)}
       <span class="tool-chip" class:errored={m.error} class:running={m.pending}>
-        {m.tool ?? "tool"}{m.pending ? "…" : ""}
+        {toolLabel(m.tool, m.args)}{m.pending ? "…" : ""}
       </span>
     {/each}
     {#if items.length > 8}
@@ -86,7 +87,7 @@
         <span class="tool-run-glyph" class:ok={status(m) === "ok"} class:err={status(m) === "err"} class:run={status(m) === "run"}>
           {glyph(m)}
         </span>
-        <span class="tool-run-name">{m.tool ?? "tool"}</span>
+        <span class="tool-run-name">{toolLabel(m.tool, m.args)}</span>
         {#if m.pending}<span class="text-[11px] text-accent animate-pulse">running…</span>{/if}
         <span class="tool-run-preview">{preview(m)}</span>
       </summary>
