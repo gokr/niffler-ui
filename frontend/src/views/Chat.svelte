@@ -4,6 +4,7 @@
   import { send, sendAs, on, emit } from "../nats";
   import { renderMarkdown } from "$lib/markdown";
   import ToolRun from "./ToolRun.svelte";
+  import { listAllMessages } from "../lib/messagePages";
   import Thinking from "../components/Thinking.svelte";
   import { t, type DictKey } from "$lib/i18n.svelte";
   import { thinkLevel, toolLevel, setThinkLevel, setToolLevel, type ThinkLevel, type ToolLevel } from "../lib/prefs.svelte";
@@ -578,16 +579,10 @@
   async function loadHistory(l: Live, sid: string | null) {
     if (!sid) return;
     try {
-      const resp = await send("store", "list", {
-        kind: "message",
-        idPrefix: sid + ":",
-      });
+      const items = await listAllMessages(send, sid);
       const stored: Msg[] = [];
-      // Tool results carry no arguments of their own: pair each stored tool
-      // message with the call that produced it so the compact gateway labels
-      // (discover(fabric), invoke(fetch)) survive a reload.
       const callArgs = new Map<string, any>();
-      for (const item of resp.items ?? []) {
+      for (const item of items) {
         const v = item.value ?? {};
         if (v.role === "tool") {
           stored.push({ role: "tool", content: v.content, tool: v.name,
