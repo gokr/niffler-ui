@@ -618,6 +618,18 @@
     }
   }
 
+  // Core's compaction refusal reasons -> the chrome note each one renders
+  // (docs/WIRE.md "Context events"). Every refusal carries a human-readable
+  // detail, so the user learns why the ladder fell through to a trim.
+  const COMPACTION_NOTE_KEYS: Record<string, DictKey> = {
+    "compact:unavailable": "chat.compactionUnavailable",
+    "compact:declined": "chat.compactionDeclined",
+    "compact:invalid": "chat.compactionInvalid",
+    "compact:stale": "chat.compactionStale",
+    "compact:failed": "chat.compactionFailed",
+    "compact:no-cut": "chat.compactionDeclined",
+  };
+
   onMount(() => {
     const off = on("ev.session.", (ev) => {
       const p = ev.payload ?? {};
@@ -662,18 +674,38 @@
         if (p.error) resolvePending(l, { content: "⚠ " + p.error });
         else if (p.reply) resolvePending(l, { content: p.reply });
       } else if (kind === "context") {
-        if (p.trimmed) {
+        // Render EVERY context reason core emits. A compaction refusal used to
+        // be dropped here, so the one thing that explained why the ladder kept
+        // trimming never reached the user; and the threshold warning invented
+        // its own percentage instead of naming core's actual trim line.
+        const reason = String(p.reason ?? "");
+        if (reason === "warn:threshold" || p.warning) {
+          const used = Number(p.usedTokens ?? p.promptTokens ?? 0);
+          const pct = p.context ? Math.round((used / p.context) * 100) : 0;
+          const trimAt = Number(p.trimAt ?? 0);
+          l.ctxNote = trimAt > 0 && p.context
+            ? t("chat.contextAt", {
+                pct: String(pct),
+                trim: String(Math.round((trimAt / p.context) * 100)),
+              })
+            : t("chat.contextAtSoon", { pct: String(pct) });
+        } else if (p.trimmed) {
           l.ctxNote = t("chat.contextTrimmed", { n: String(p.trimmed) });
-        } else if (p.warning) {
-          const pct = p.context ? Math.round((p.promptTokens / p.context) * 100) : 0;
-          l.ctxNote = t("chat.contextAt", { pct: String(pct) });
+        } else if (reason === "reset:prune") {
+          l.ctxNote = t("chat.pruned", { bytes: String(p.bytesSaved ?? 0) });
+        } else if (COMPACTION_NOTE_KEYS[reason]) {
+          const label = t(COMPACTION_NOTE_KEYS[reason]);
+          const detail = String(p.detail ?? p.error ?? "");
+          l.ctxNote = detail ? label + " — " + detail : label;
+        } else if (reason.startsWith("compact:")) {
+          l.ctxNote = t("chat.compactionOther", { reason: reason.slice(8) });
         }
-        if (p.reason === "reset:trim") {
+        if (reason === "reset:trim") {
           // History reset: the provider's prompt cache is dead past the
           // remaining prefix — the next request pays full prompt price.
           l.ctxNote = (l.ctxNote ? l.ctxNote + " · " : "") +
             t("chat.cacheReset");
-        } else if (p.reason === "reset:compact") {
+        } else if (reason === "reset:compact") {
           // The commit zeroes the measured size and the gauge shows the
           // estimate core just published; the next request re-measures.
           l.ctxNote = (l.ctxNote ? l.ctxNote + " · " : "") +
