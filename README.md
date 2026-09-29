@@ -65,6 +65,55 @@ executable's own directory.
 `make bindings` seeds a placeholder `frontend/dist` first, because generating
 the bindings compiles the Go package, which `//go:embed`s that directory.
 
+## Commands and keys
+
+Type `/` in the composer — `Tab` completes, `Enter` accepts, `Esc` dismisses.
+`/help` prints the live list (with each command's arguments and every key
+combo), so the tables below are the documentation, not the source of truth:
+`slash.ts` owns the command list and `lib/helpKeys.ts` the key combos, and
+`frontend/tests/help.test.mjs` fails if `/help`, the locales and this README
+ever disagree.
+
+### Chat commands
+
+| Command | What it does |
+|---|---|
+| `/components` | running components and this conversation's tool exposure |
+| `/discover` | append component schemas to this conversation (`tool=NAME` for one) |
+| `/profile` | select the tool profile for new conversations |
+| `/provider` | provider setup, switching and credentials |
+| `/model` | choose this conversation's model |
+| `/effort` | this conversation's thinking effort |
+| `/approvals` | this conversation's approval gate mode (`ask` / `auto`) |
+| `/limit` | soft turn budgets: rounds, tokens, seconds |
+| `/compact` | run the compactor now, without a turn |
+| `/connect` | open provider setup |
+| `/status` | provider, model and context details |
+| `/new` | start a new conversation |
+| `/session` | switch, search or list conversations |
+| `/think` | show or hide reasoning blocks |
+| `/tools` | tool-card detail level |
+| `/locale` | interface language |
+| `/info` | build and harness information |
+| `/help` | this list, rendered live |
+
+Commands contributed by installed plugins appear under their own heading in
+`/help`.
+
+### Keyboard shortcuts
+
+| Keys | Where | What |
+|---|---|---|
+| `Enter` / `Esc` | composer | send the message (`Esc` first dismisses an open completion popup) |
+| `Shift+Enter` | composer | newline instead of sending |
+| `↑` / `↓` | composer | walk command history; the unsent draft is preserved |
+| `Tab` / `Shift+Tab` | `/…` in the composer | open slash completion / cycle the candidates |
+| `Enter` / `Esc` | completion popup | accept the highlighted command / dismiss the popup |
+| `Ctrl+T` | anywhere | cycle the reasoning display: full → brief → off |
+| `Ctrl+E` | anywhere | cycle tool cards: brief → full → off |
+| `Ctrl+G` | anywhere | cycle the thinking effort |
+| `Enter` / `Esc` | approval prompt | approve / deny a gated tool call |
+
 ## Relationship to the harness
 
 - It registers on the bus as a component with **zero tools** and `client: true`

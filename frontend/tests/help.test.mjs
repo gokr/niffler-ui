@@ -3,6 +3,11 @@
 // lib/helpKeys.ts is the single source of truth for the key combos. If a
 // command or a combo is added in one place and forgotten in the others,
 // these fail.
+//
+// Paths are relative to THIS repository: the SPA used to live at
+// `<harness>/ui/frontend`, so the salvaged version read the harness README and
+// `ui/frontend/...`; in its own repository the contract is self-contained —
+// the UI's README documents the same commands and keys it renders in /help.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -12,8 +17,8 @@ import { builtinSlashCommands, commandUsage } from '../src/lib/slash.ts';
 import { buildHelpText, helpCommandNames } from '../src/lib/help.ts';
 import { helpKeyTokens, helpKeyTokenList } from '../src/lib/helpKeys.ts';
 
-const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
-const enDict = () => readFileSync(join(repoRoot, 'ui/frontend/src/lib/i18n.svelte.ts'), 'utf8');
+const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
+const enDict = () => readFileSync(join(repoRoot, 'frontend/src/lib/i18n.svelte.ts'), 'utf8');
 const readme = () => readFileSync(join(repoRoot, 'README.md'), 'utf8');
 
 const helpArgs = (keyLines = ['Global: Ctrl+T · Ctrl+E · Ctrl+G', 'Composer: Enter · Shift+Enter · ↑/↓ · Tab · Shift+Tab']) =>
