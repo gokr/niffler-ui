@@ -5,12 +5,20 @@
 #   make test        frontend unit tests (no dependencies needed)
 #   make typecheck   tsc --noEmit + svelte-check
 #   make install     desktop integration (~/.local/bin + .desktop + icons)
+#   make install-deps  the Linux/runtime prerequisites (webkit2gtk 4.1 + GTK3)
+#   make install-into-harness H=/path/to/niffler  install through a harness's
+#                    plugin lifecycle (isolated, auto-approved boot) — this is
+#                    the whole of `make install-ui`, which the harness dropped
+#                    when it demoted this app to an experimental side project
 #   make clean       drop build output and generated artifacts
 #
 # NIF_ROOT is baked into the binary when set (icon launches have no env and no
 # helpful layout); leave it empty for a checkout-local build that finds the
 # harness by walking up from the executable.
 
+H        ?= $(NIF_HARNESS)
+SUDO     ?= sudo
+IS_MAC   := $(shell uname -s 2>/dev/null | grep -i darwin)
 WAILS    ?= $(shell command -v wails 2>/dev/null || echo "$(HOME)/go/bin/wails")
 UI_TAGS  ?= -tags webkit2_41
 BIN      := build/bin/niffler-ui
@@ -22,7 +30,7 @@ DESKTOP_DIR := $(HOME)/.local/share/applications
 ICON_DIR    := $(HOME)/.local/share/icons/hicolor
 DESKTOP_DST := $(DESKTOP_DIR)/niffler.desktop
 
-.PHONY: all build bindings deps spa dev test typecheck install uninstall clean
+.PHONY: all build bindings deps spa dev test typecheck install install-deps install-into-harness uninstall clean
 
 all: build
 
@@ -41,6 +49,23 @@ bindings:
 
 deps:
 	cd frontend && npm ci --no-audit --no-fund
+
+# The runtime prerequisites this app needs beyond Go/Node. These used to be the
+# harness's `make install-ui-deps`; they belong with the app now.
+install-deps:
+	@if [ -n "$(IS_MAC)" ]; then echo "install-deps: nothing to do on macOS"; \
+	elif pkg-config --exists webkit2gtk-4.1 2>/dev/null; then \
+		echo "webkit2gtk-4.1: already installed"; \
+	else echo "Installing webkit2gtk 4.1 + GTK3 dev packages ..."; \
+		$(SUDO) apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev; fi
+
+# Install into a harness checkout through its plugin lifecycle. The harness
+# itself no longer installs this app: that script (scripts/install-ui.sh) was
+# removed when the UI was demoted, so the flow lives here, next to the package.
+#   make install-into-harness H=~/git/niffler      # or NIF_HARNESS=…
+install-into-harness:
+	@[ -n "$(H)" ] || { echo "usage: make install-into-harness H=/path/to/niffler"; exit 1; }
+	bash ./scripts/install-into-harness.sh "$(H)"
 
 spa: bindings
 	cd frontend && npm run build
