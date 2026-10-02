@@ -4,15 +4,15 @@
   import { send, sendAs, on, emit } from "../nats";
   import { renderMarkdown } from "$lib/markdown";
   import ToolRun from "./ToolRun.svelte";
+  import { buildHelpText } from "../lib/help";
+  import { listAllMessages } from "../lib/messagePages";
   import Thinking from "../components/Thinking.svelte";
   import { t, type DictKey } from "$lib/i18n.svelte";
   import { thinkLevel, toolLevel, setThinkLevel, setToolLevel, type ThinkLevel, type ToolLevel } from "../lib/prefs.svelte";
   import {
     mergeSlashCommands,
     loadPluginSlashCommands,
-    builtinSlashCommands,
     slashCompletion,
-    commandUsage,
     fetchCompletionValues,
     suggestSlash,
     type SlashCommand,
@@ -266,21 +266,19 @@
   }
 
   function helpText(): string {
-    // Generated from builtinSlashCommands() so /help can never go stale —
-    // the command list (names, params, aliases) lives in slash.ts and only
-    // the descriptions are localized (slash.* keys, English fallback).
-    const lines = [t("help.title")];
-    for (const c of builtinSlashCommands()) {
-      if (c.aliasOf) continue;
-      lines.push(`  /${c.name}${commandUsage(c)} — ${slashDescription(c.name, c.description ?? "")}`);
-    }
-    lines.push("", t("help.keys"));
-    const plugins = slashCmds.filter((c) => !c.builtin);
-    if (plugins.length > 0) {
-      lines.push("", t("help.pluginTitle"));
-      for (const c of plugins) lines.push(`  /${c.name}${c.description ? " — " + c.description : ""} (${c.component})`);
-    }
-    return lines.join("\n");
+    // The command list is generated from slash.ts (so /help can never go
+    // stale), the descriptions are localized via slashDescription(), and the
+    // key lines carry the same tokens README.md documents — both come from
+    // lib/helpKeys.ts, which tests/help.test.mjs checks on both sides.
+    return buildHelpText({
+      title: t("help.title"),
+      keyLines: [t("help.input"), t("help.keys")],
+      pluginTitle: t("help.pluginTitle"),
+      plugins: slashCmds
+        .filter((c) => !c.builtin)
+        .map((c) => ({ name: c.name, description: c.description, component: c.component })),
+      describe: (name, fallback) => slashDescription(name, fallback),
+    });
   }
 
   /** Pi-/session-style summary of core's session_info result: identity,
@@ -578,16 +576,22 @@
   async function loadHistory(l: Live, sid: string | null) {
     if (!sid) return;
     try {
-      const resp = await send("store", "list", {
-        kind: "message",
-        idPrefix: sid + ":",
-      });
+      const items = await listAllMessages(send, sid);
       const stored: Msg[] = [];
-      for (const item of resp.items ?? []) {
+      const callArgs = new Map<string, any>();
+      for (const item of items) {
         const v = item.value ?? {};
         if (v.role === "tool") {
-          stored.push({ role: "tool", content: v.content, tool: v.name });
+          stored.push({ role: "tool", content: v.content, tool: v.name,
+                        args: callArgs.get(v.tool_call_id) });
+          callArgs.delete(v.tool_call_id);
         } else if (v.role === "assistant") {
+          for (const call of v.tool_calls ?? []) {
+            if (call.id && typeof call.function?.arguments === "string") {
+              try { callArgs.set(call.id, JSON.parse(call.function.arguments)); }
+              catch { /* malformed tool arguments have no compact label */ }
+            }
+          }
           stored.push({
             role: "assistant",
             content: v.content ?? "",
